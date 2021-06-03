@@ -159,11 +159,11 @@ def insert_filepaths_to_projects(path):
                 """.format(path))
 
 if __name__ == "__main__":
-    fromelma = get_filepaths_from_sitedb()
+    fromsite = get_filepaths_from_sitedb()
     #print (fromelma)
     fromprojects = get_filepaths_from_projects()
     #print (fromprojects)
-    newrojects = fromelma - fromprojects
+    newrojects = fromsite - fromprojects
     #print (newrojects)
     elma = ELMA()
     for row in newrojects:  
