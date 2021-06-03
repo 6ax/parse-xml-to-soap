@@ -105,7 +105,7 @@ class ELMA:
         self.url = elmasoapurl
         self.headers = {'content-type': 'text/xml;charset=UTF-8', 'Accept-Encoding': 'gzip,deflate', 'SOAPAction': 'http://www.elma-bpm.ru/WFPWebService/Run'}
         try:
-            response = requests.post(self.url,data=self.__create_SOAP_request___(),headers=self.headers, timeout=3)
+            response = requests.post(self.url,data=self.__create_SOAP_request___(),headers=self.headers, timeout=20)
             #print (response.content)
             regex = r"<RunResult>(\d*)</RunResult>"
             self.instanceid = re.search(regex, str(response.content)).group(1)
@@ -114,13 +114,19 @@ class ELMA:
                 os._exit(0)
         except requests.exceptions.Timeout as err:
              print ("Timeout Error:",err)
+        except requests.exceptions.RequestException as err:
+            print ("OOps: Something Else",err)
+        except requests.exceptions.HTTPError as err:
+            print ("Http Error:",err)
+        except requests.exceptions.ConnectionError as err:
+            print ("Error Connecting:",err)
 
 def get_filepaths_from_sitedb(): 
     conn = DBHelper(dbhost, sitedbuser, sitedbuserpassword, sitedbname)
     cursor = conn.fetch("""
                         SELECT path
                         FROM dvlp_project_application
-                        WHERE updated_at <= '{}';
+                        WHERE updated_at >= '{}';
                         """.format(startexporttime))
     retset = set()
     for row in cursor:
@@ -152,46 +158,13 @@ def insert_filepaths_to_projects(path):
                 ('{}')
                 """.format(path))
 
-def create_SOAP_request(file_name):
-    tree = ET.parse(file_name)
-    source = tree.getroot()
-    global soap
-    soap = """
-    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wfp="http://www.elma-bpm.ru/WFPWebService/">
-        <soapenv:Header/>
-        <soapenv:Body>
-            <wfp:Run>
-                <wfp:userName>admin</wfp:userName>
-                <wfp:password>admin</wfp:password>
-                <wfp:token>WFP_ApplicationFromExternalsystem</wfp:token>
-                <wfp:instanceName>ApplicationFromExternalsystem</wfp:instanceName>
-                <wfp:data>
-                    <wfp:Items>
-    """
-
-    for item in source.findall(".//field"):
-        #print (item.get('id'), item.text)
-        soap += """
-        <wfp:WebDataItem>
-            <wfp:Name>{}</wfp:Name>'
-            <wfp:Value>{}</wfp:Value>
-        </wfp:WebDataItem>
-        """.format(item.get('id'), item.text)
-
-    soap += """
-                    </wfp:Items>
-                </wfp:data>
-            </wfp:Run>
-        </soapenv:Body>
-    </soapenv:Envelope>
-    """
-    soap = soap.encode('utf-8')
-    print (soap)
-
 if __name__ == "__main__":
     fromelma = get_filepaths_from_sitedb()
+    #print (fromelma)
     fromprojects = get_filepaths_from_projects()
+    #print (fromprojects)
     newrojects = fromelma - fromprojects
+    #print (newrojects)
     elma = ELMA()
     for row in newrojects:  
         elma.send_SOAP(row)
